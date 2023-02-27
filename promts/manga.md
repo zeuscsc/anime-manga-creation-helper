@@ -1,0 +1,3 @@
+best quality, perfect lighting, shiny skin, manga cover, looking at the control panel, laboratory, pink hair,blue screen,
+Negative prompt: (extra fingers), (missing fingers), (extra limb), (bad anatomy), (bad proportions),(worst quality, low quality, blurry:1.4),
+Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 4042757183, Size: 512x512, Model hash: 99d9ce8a35, Model: El Diablo, ControlNet Enabled: True, ControlNet Module: openpose, ControlNet Model: control_sd15_openpose [fef5e48e], ControlNet Weight: 1, ControlNet Guidance Strength: False

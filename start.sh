@@ -1,0 +1,1 @@
+source python launch.py --no-half --xformers
