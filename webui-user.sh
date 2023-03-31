@@ -10,6 +10,7 @@ install_dir="/home/$(whoami)"
 clone_dir="stable-diffusion-webui"
 
 # Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--medvram --opt-split-attention"
+# Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--medvram --no-half-vae --opt-split-attention"
 export COMMANDLINE_ARGS="--enable-insecure-extension-access --api --cors-allow-origins=*"
 
 # python3 executable
