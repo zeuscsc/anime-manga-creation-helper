@@ -11,6 +11,7 @@ clone_dir="stable-diffusion-webui"
 
 # Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--medvram --opt-split-attention"
 # Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--medvram --no-half-vae --opt-split-attention"
+# Commandline arguments for webui.py, for example: export COMMANDLINE_ARGS="--use-cpu all --no-half --precision full --skip-torch-cuda-test"
 export COMMANDLINE_ARGS="--enable-insecure-extension-access --api --cors-allow-origins=*"
 
 # python3 executable

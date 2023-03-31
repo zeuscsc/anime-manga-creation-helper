@@ -90,6 +90,8 @@ class Script(scripts.Script):
         return [poUseColor,poFormat, poOpaque, poTight, poKeepPnm, poThreshold, poTransPNG, poTransPNGEps,poDoVector,poTransPNGQuant]
 
     def run(self, p, poUseColor,poFormat, poOpaque, poTight, poKeepPnm, poThreshold, poTransPNG, poTransPNGEps,poDoVector, poTransPNGQuant):
+        print(poUseColor,poFormat, poOpaque, poTight, poKeepPnm, poThreshold, poTransPNG, poTransPNGEps,poDoVector, poTransPNGQuant)
+        svg=""
         PO_TO_CALL = self.check_Potrace_install()
 
         p.do_not_save_grid = True
@@ -141,12 +143,13 @@ class Script(scripts.Script):
                     self.doTransPNG(poTransPNGEps, mixedImages, img, fullofTPNG, poTransPNGQuant)
 
                 if poDoVector:
-                    self.doVector(poFormat, poOpaque, poTight, poKeepPnm, poThreshold, PO_TO_CALL, img, fullofpnm, fullof, mixedImages)
+                    svg=self.doVector(poFormat, poOpaque, poTight, poKeepPnm, poThreshold, PO_TO_CALL, img, fullofpnm, fullof, mixedImages)
 
         except (Exception):
             raise Exception("TXT2Vectorgraphics: Execution of Potrace failed, check filesystem, permissions, installation or settings (is image saving on?)")
 
-        return Processed(p, mixedImages, p.seed, proc.info)
+        res = Processed(p, mixedImages, p.seed, proc.info,comments=svg)
+        return res
 
     def doVector(self, poFormat, poOpaque, poTight, poKeepPnm, poThreshold, PO_TO_CALL, img, fullofpnm, fullof, mixedImages):
         # for vectorizing
@@ -165,6 +168,7 @@ class Script(scripts.Script):
 
         abspathsvg = os.path.abspath(fullof)
         mixedImages.append([abspathsvg,"SVG"]) # img, caption
+        return abspathsvg
 
     def doTransPNG(self, poTransPNGEps, mixedImages, img, fullofTPNG, poTransPNGQuant):
         #Image.quantize(colors=256, method=None, kmeans=0, palette=None)
