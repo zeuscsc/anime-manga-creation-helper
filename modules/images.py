@@ -261,12 +261,9 @@ def resize_image(resize_mode, im, width, height, upscaler_name=None):
 
         if scale > 1.0:
             upscalers = [x for x in shared.sd_upscalers if x.name == upscaler_name]
-            if len(upscalers) == 0:
-                upscaler = shared.sd_upscalers[0]
-                print(f"could not find upscaler named {upscaler_name or '<empty string>'}, using {upscaler.name} as a fallback")
-            else:
-                upscaler = upscalers[0]
+            assert len(upscalers) > 0, f"could not find upscaler named {upscaler_name}"
 
+            upscaler = upscalers[0]
             im = upscaler.scaler.upscale(im, scale, upscaler.data_path)
 
         if im.width != w or im.height != h:
@@ -648,8 +645,6 @@ Steps: {json_info["steps"]}, Sampler: {sampler}, CFG scale: {json_info["scale"]}
 
 
 def image_data(data):
-    import gradio as gr
-
     try:
         image = Image.open(io.BytesIO(data))
         textinfo, _ = read_info_from_image(image)
@@ -665,7 +660,7 @@ def image_data(data):
     except Exception:
         pass
 
-    return gr.update(), None
+    return '', None
 
 
 def flatten(img, bgcolor):

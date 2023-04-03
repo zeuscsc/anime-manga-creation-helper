@@ -6,21 +6,23 @@ from tqdm import trange
 import modules.scripts as scripts
 import gradio as gr
 
-from modules import processing, shared, sd_samplers, sd_samplers_common
+from modules import processing, shared, sd_samplers, prompt_parser, sd_samplers_common
+from modules.processing import Processed
+from modules.shared import opts, cmd_opts, state
 
 import torch
 import k_diffusion as K
+
+from PIL import Image
+from torch import autocast
+from einops import rearrange, repeat
+
 
 def find_noise_for_image(p, cond, uncond, cfg_scale, steps):
     x = p.init_latent
 
     s_in = x.new_ones([x.shape[0]])
-    if shared.sd_model.parameterization == "v":
-        dnw = K.external.CompVisVDenoiser(shared.sd_model)
-        skip = 1
-    else:
-        dnw = K.external.CompVisDenoiser(shared.sd_model)
-        skip = 0
+    dnw = K.external.CompVisDenoiser(shared.sd_model)
     sigmas = dnw.get_sigmas(steps).flip(0)
 
     shared.state.sampling_steps = steps
@@ -35,7 +37,7 @@ def find_noise_for_image(p, cond, uncond, cfg_scale, steps):
         image_conditioning = torch.cat([p.image_conditioning] * 2)
         cond_in = {"c_concat": [image_conditioning], "c_crossattn": [cond_in]}
 
-        c_out, c_in = [K.utils.append_dims(k, x_in.ndim) for k in dnw.get_scalings(sigma_in)[skip:]]
+        c_out, c_in = [K.utils.append_dims(k, x_in.ndim) for k in dnw.get_scalings(sigma_in)]
         t = dnw.sigma_to_t(sigma_in)
 
         eps = shared.sd_model.apply_model(x_in * c_in, t, cond=cond_in)
@@ -67,12 +69,7 @@ def find_noise_for_image_sigma_adjustment(p, cond, uncond, cfg_scale, steps):
     x = p.init_latent
 
     s_in = x.new_ones([x.shape[0]])
-    if shared.sd_model.parameterization == "v":
-        dnw = K.external.CompVisVDenoiser(shared.sd_model)
-        skip = 1
-    else:
-        dnw = K.external.CompVisDenoiser(shared.sd_model)
-        skip = 0
+    dnw = K.external.CompVisDenoiser(shared.sd_model)
     sigmas = dnw.get_sigmas(steps).flip(0)
 
     shared.state.sampling_steps = steps
@@ -87,7 +84,7 @@ def find_noise_for_image_sigma_adjustment(p, cond, uncond, cfg_scale, steps):
         image_conditioning = torch.cat([p.image_conditioning] * 2)
         cond_in = {"c_concat": [image_conditioning], "c_crossattn": [cond_in]}
 
-        c_out, c_in = [K.utils.append_dims(k, x_in.ndim) for k in dnw.get_scalings(sigma_in)[skip:]]
+        c_out, c_in = [K.utils.append_dims(k, x_in.ndim) for k in dnw.get_scalings(sigma_in)]
 
         if i == 1:
             t = dnw.sigma_to_t(torch.cat([sigmas[i] * s_in] * 2))
@@ -128,7 +125,7 @@ class Script(scripts.Script):
     def show(self, is_img2img):
         return is_img2img
 
-    def ui(self, is_img2img):
+    def ui(self, is_img2img):     
         info = gr.Markdown('''
         * `CFG Scale` should be 2 or lower.
         ''')
@@ -216,3 +213,4 @@ class Script(scripts.Script):
         processed = processing.process_images(p)
 
         return processed
+

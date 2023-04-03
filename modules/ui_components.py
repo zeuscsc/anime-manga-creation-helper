@@ -1,61 +1,55 @@
 import gradio as gr
 
 
-class FormComponent:
-    def get_expected_parent(self):
-        return gr.components.Form
-
-
-gr.Dropdown.get_expected_parent = FormComponent.get_expected_parent
-
-
-class ToolButton(FormComponent, gr.Button):
+class ToolButton(gr.Button, gr.components.FormComponent):
     """Small button with single emoji as text, fits inside gradio forms"""
 
-    def __init__(self, *args, **kwargs):
-        classes = kwargs.pop("elem_classes", [])
-        super().__init__(*args, elem_classes=["tool", *classes], **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(variant="tool", **kwargs)
 
     def get_block_name(self):
         return "button"
 
 
-class FormRow(FormComponent, gr.Row):
+class ToolButtonTop(gr.Button, gr.components.FormComponent):
+    """Small button with single emoji as text, with extra margin at top, fits inside gradio forms"""
+
+    def __init__(self, **kwargs):
+        super().__init__(variant="tool-top", **kwargs)
+
+    def get_block_name(self):
+        return "button"
+
+
+class FormRow(gr.Row, gr.components.FormComponent):
     """Same as gr.Row but fits inside gradio forms"""
 
     def get_block_name(self):
         return "row"
 
 
-class FormColumn(FormComponent, gr.Column):
-    """Same as gr.Column but fits inside gradio forms"""
-
-    def get_block_name(self):
-        return "column"
-
-
-class FormGroup(FormComponent, gr.Group):
+class FormGroup(gr.Group, gr.components.FormComponent):
     """Same as gr.Row but fits inside gradio forms"""
 
     def get_block_name(self):
         return "group"
 
 
-class FormHTML(FormComponent, gr.HTML):
+class FormHTML(gr.HTML, gr.components.FormComponent):
     """Same as gr.HTML but fits inside gradio forms"""
 
     def get_block_name(self):
         return "html"
 
 
-class FormColorPicker(FormComponent, gr.ColorPicker):
+class FormColorPicker(gr.ColorPicker, gr.components.FormComponent):
     """Same as gr.ColorPicker but fits inside gradio forms"""
 
     def get_block_name(self):
         return "colorpicker"
 
 
-class DropdownMulti(FormComponent, gr.Dropdown):
+class DropdownMulti(gr.Dropdown):
     """Same as gr.Dropdown but always multiselect"""
     def __init__(self, **kwargs):
         super().__init__(multiselect=True, **kwargs)

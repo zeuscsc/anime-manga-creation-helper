@@ -1,5 +1,5 @@
 
-function extensions_apply(_, _, disable_all){
+function extensions_apply(_, _){
     var disable = []
     var update = []
 
@@ -13,10 +13,10 @@ function extensions_apply(_, _, disable_all){
 
     restart_reload()
 
-    return [JSON.stringify(disable), JSON.stringify(update), disable_all]
+    return [JSON.stringify(disable), JSON.stringify(update)]
 }
 
-function extensions_check(_, _){
+function extensions_check(){
     var disable = []
 
     gradioApp().querySelectorAll('#extensions input[type="checkbox"]').forEach(function(x){
