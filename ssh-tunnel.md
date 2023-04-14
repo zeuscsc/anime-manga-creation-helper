@@ -1,0 +1,1 @@
+ssh -i ~/.ssh/zeus_aws_acer -o TCPKeepAlive=yes -o ServerAliveCountMax=20 -o ServerAliveInterval=15 -vnNT -R sd.zeuschiu.com:7860:127.0.0.1:7860 root@sd.zeuschiu.com
