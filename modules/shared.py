@@ -112,6 +112,8 @@ parser.add_argument("--skip-version-check", action='store_true', help="Do not ch
 parser.add_argument("--no-hashing", action='store_true', help="disable sha256 hashing of checkpoints to help loading performance", default=False)
 parser.add_argument("--no-download-sd-model", action='store_true', help="don't download SD1.5 model even if no model is found in --ckpt-dir", default=False)
 
+parser.add_argument("--tecky-auth",action='store_true', help="use tecky auth server for auth", default=False)
+
 
 script_loading.preload_extensions(extensions.extensions_dir, parser)
 script_loading.preload_extensions(extensions.extensions_builtin_dir, parser)

@@ -6,8 +6,8 @@ import uvicorn
 from threading import Lock
 from io import BytesIO
 from gradio.processing_utils import decode_base64_to_file
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response,status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials,APIKeyHeader
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from secrets import compare_digest
 
 import modules.shared as shared
@@ -26,7 +26,6 @@ from typing import List
 import piexif
 import piexif.helper
 
-api_key_header = APIKeyHeader(name="tecky_api_service_key", auto_error=False)
 def upscaler_to_index(name: str):
     try:
         return [x.name.lower() for x in shared.sd_upscalers].index(name.lower())
@@ -154,13 +153,8 @@ class Api:
         self.add_api_route("/sdapi/v1/scripts", self.get_scripts_list, methods=["GET"], response_model=ScriptsList)
 
     def add_api_route(self, path: str, endpoint, **kwargs):
-        if shared.cmd_opts.api_auth or shared.cmd_opts.tecky_auth:
-            dependencies=[]
-            if shared.cmd_opts.api_auth:
-                dependencies.append(Depends(self.auth))
-            if shared.cmd_opts.tecky_auth:
-                dependencies.append(Depends(self.tecky_auth))
-            return self.app.add_api_route(path, endpoint, dependencies=dependencies, **kwargs)
+        if shared.cmd_opts.api_auth:
+            return self.app.add_api_route(path, endpoint, dependencies=[Depends(self.auth)], **kwargs)
         return self.app.add_api_route(path, endpoint, **kwargs)
 
     def auth(self, credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
@@ -169,13 +163,6 @@ class Api:
                 return True
 
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
-    def tecky_auth(self,api_key_header:str=Depends(api_key_header)):
-        if api_key_header is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key missing")
-        API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
-        if api_key_header not in API_KEYS:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-        return api_key_header
 
     def get_selectable_script(self, script_name, script_runner):
         if script_name is None or script_name == "":
