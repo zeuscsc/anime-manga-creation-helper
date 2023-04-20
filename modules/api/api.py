@@ -26,7 +26,7 @@ from typing import List
 import piexif
 import piexif.helper
 
-api_key_header = APIKeyHeader(name="tecky_api_service_key", auto_error=False)
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 def upscaler_to_index(name: str):
     try:
         return [x.name.lower() for x in shared.sd_upscalers].index(name.lower())
