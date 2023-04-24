@@ -171,12 +171,14 @@ class Api:
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
     def tecky_auth(self,api_key_header:str=Depends(api_key_header)):
         if api_key_header is None:
-            # raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key missing")
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Server is busy and API key missing")
             return api_key_header
         API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
         if api_key_header not in API_KEYS:
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Server is busy and Invalid API key")
             return api_key_header
-            # raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
         return api_key_header
 
     def get_selectable_script(self, script_name, script_runner):
