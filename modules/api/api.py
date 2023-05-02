@@ -7,7 +7,7 @@ import gradio as gr
 from threading import Lock
 from io import BytesIO
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials,APIKeyHeader
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -28,6 +28,8 @@ from modules import devices
 from typing import List
 import piexif
 import piexif.helper
+
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 def upscaler_to_index(name: str):
     try:
@@ -201,8 +203,13 @@ class Api:
         self.default_script_arg_img2img = []
 
     def add_api_route(self, path: str, endpoint, **kwargs):
-        if shared.cmd_opts.api_auth:
-            return self.app.add_api_route(path, endpoint, dependencies=[Depends(self.auth)], **kwargs)
+        if shared.cmd_opts.api_auth or shared.cmd_opts.tecky_auth:
+            dependencies=[]
+            if shared.cmd_opts.api_auth:
+                dependencies.append(Depends(self.auth))
+            if shared.cmd_opts.tecky_auth:
+                dependencies.append(Depends(self.tecky_auth))
+            return self.app.add_api_route(path, endpoint, dependencies=dependencies, **kwargs)
         return self.app.add_api_route(path, endpoint, **kwargs)
 
     def auth(self, credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
@@ -211,6 +218,21 @@ class Api:
                 return True
 
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
+    def tecky_auth(self,api_key_header:str=Depends(api_key_header)):
+        if api_key_header is None:
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=403, detail="Server is busy and API key missing")
+            shared.tecky_auth.valid = True
+            return True
+        shared.tecky_auth.auth_token = api_key_header
+        API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
+        if api_key_header not in API_KEYS:
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=401, detail="Server is busy and Invalid API key")
+            shared.tecky_auth.valid = True
+            return True
+        shared.tecky_auth.valid = True
+        return True
 
     def get_selectable_script(self, script_name, script_runner):
         if script_name is None or script_name == "":
