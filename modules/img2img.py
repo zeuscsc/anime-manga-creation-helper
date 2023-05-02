@@ -4,7 +4,7 @@ import sys
 import traceback
 
 import numpy as np
-from PIL import Image, ImageOps, ImageFilter, ImageEnhance, ImageChops
+from PIL import Image, ImageOps, ImageFilter, ImageEnhance, ImageChops, UnidentifiedImageError
 
 from modules import devices, sd_samplers
 from modules.generation_parameters_copypaste import create_override_settings_dict
@@ -17,7 +17,7 @@ import modules.images as images
 import modules.scripts
 
 
-def process_batch(p, input_dir, output_dir, inpaint_mask_dir, control_dir, args):
+def process_batch(p, input_dir, output_dir, inpaint_mask_dir, args):
     processing.fix_seed(p)
 
     images = shared.listfiles(input_dir)
@@ -28,13 +28,6 @@ def process_batch(p, input_dir, output_dir, inpaint_mask_dir, control_dir, args)
         is_inpaint_batch = len(inpaint_masks) > 0
     if is_inpaint_batch:
         print(f"\nInpaint batch is enabled. {len(inpaint_masks)} masks found.")
-
-    is_control_batch = False
-    if control_dir:
-        control_images = shared.listfiles(control_dir)
-        is_control_batch = len(control_images) > 0
-    if is_control_batch:
-        print(f"\nControlNet batch is enabled. {len(control_images)} control images found.")
 
     print(f"Will process {len(images)} images, creating {p.n_iter * p.batch_size} new images for each.")
 
@@ -53,7 +46,10 @@ def process_batch(p, input_dir, output_dir, inpaint_mask_dir, control_dir, args)
         if state.interrupted:
             break
 
-        img = Image.open(image)
+        try:
+            img = Image.open(image)
+        except UnidentifiedImageError:
+            continue
         # Use the EXIF orientation of photos taken by smartphones.
         img = ImageOps.exif_transpose(img)
         p.init_images = [img] * p.batch_size
@@ -66,15 +62,6 @@ def process_batch(p, input_dir, output_dir, inpaint_mask_dir, control_dir, args)
                 mask_image_path = inpaint_masks[0]
             mask_image = Image.open(mask_image_path)
             p.image_mask = mask_image
-
-        if is_control_batch:
-            # try to find corresponding control_image for an image using simple filename matching
-            control_image_path = os.path.join(control_dir, os.path.basename(image))
-            # if not found use first one ("same control_image for all images" use-case)
-            if not control_image_path in control_images:
-                control_image_path = control_images[0]
-            control_image = Image.open(control_image_path)
-            p.image_control = control_image
 
         proc = modules.scripts.scripts_img2img.run(p, *args)
         if proc is None:
@@ -94,7 +81,7 @@ def process_batch(p, input_dir, output_dir, inpaint_mask_dir, control_dir, args)
                 processed_image.save(os.path.join(output_dir, filename))
 
 
-def img2img(id_task: str, mode: int, prompt: str, negative_prompt: str, prompt_styles, init_img, sketch, init_img_with_mask, inpaint_color_sketch, inpaint_color_sketch_orig, init_img_inpaint, init_mask_inpaint, steps: int, sampler_index: int, mask_blur: int, mask_alpha: float, inpainting_fill: int, restore_faces: bool, tiling: bool, n_iter: int, batch_size: int, cfg_scale: float, image_cfg_scale: float, denoising_strength: float, seed: int, subseed: int, subseed_strength: float, seed_resize_from_h: int, seed_resize_from_w: int, seed_enable_extras: bool, height: int, width: int, resize_mode: int, inpaint_full_res: bool, inpaint_full_res_padding: int, inpainting_mask_invert: int, img2img_batch_input_dir: str, img2img_batch_output_dir: str, img2img_batch_inpaint_mask_dir: str, img2img_batch_control_input_dir: str, override_settings_texts, *args):
+def img2img(id_task: str, mode: int, prompt: str, negative_prompt: str, prompt_styles, init_img, sketch, init_img_with_mask, inpaint_color_sketch, inpaint_color_sketch_orig, init_img_inpaint, init_mask_inpaint, steps: int, sampler_index: int, mask_blur: int, mask_alpha: float, inpainting_fill: int, restore_faces: bool, tiling: bool, n_iter: int, batch_size: int, cfg_scale: float, image_cfg_scale: float, denoising_strength: float, seed: int, subseed: int, subseed_strength: float, seed_resize_from_h: int, seed_resize_from_w: int, seed_enable_extras: bool, selected_scale_tab: int, height: int, width: int, scale_by: float, resize_mode: int, inpaint_full_res: bool, inpaint_full_res_padding: int, inpainting_mask_invert: int, img2img_batch_input_dir: str, img2img_batch_output_dir: str, img2img_batch_inpaint_mask_dir: str, override_settings_texts, *args):
     override_settings = create_override_settings_dict(override_settings_texts)
 
     is_batch = mode == 5
@@ -129,6 +116,12 @@ def img2img(id_task: str, mode: int, prompt: str, negative_prompt: str, prompt_s
     # Use the EXIF orientation of photos taken by smartphones.
     if image is not None:
         image = ImageOps.exif_transpose(image)
+
+    if selected_scale_tab == 1:
+        assert image, "Can't scale by because no image is selected"
+
+        width = int(image.width * scale_by)
+        height = int(image.height * scale_by)
 
     assert 0. <= denoising_strength <= 1., 'can only work with strength in [0.0, 1.0]'
 
@@ -167,18 +160,19 @@ def img2img(id_task: str, mode: int, prompt: str, negative_prompt: str, prompt_s
         override_settings=override_settings,
     )
 
-    p.scripts = modules.scripts.scripts_txt2img
+    p.scripts = modules.scripts.scripts_img2img
     p.script_args = args
 
     if shared.cmd_opts.enable_console_prompts:
         print(f"\nimg2img: {prompt}", file=shared.progress_print_out)
 
-    p.extra_generation_params["Mask blur"] = mask_blur
+    if mask:
+        p.extra_generation_params["Mask blur"] = mask_blur
 
     if is_batch:
         assert not shared.cmd_opts.hide_ui_dir_config, "Launched with --hide-ui-dir-config, batch img2img disabled"
 
-        process_batch(p, img2img_batch_input_dir, img2img_batch_output_dir, img2img_batch_inpaint_mask_dir, img2img_batch_control_input_dir, args)
+        process_batch(p, img2img_batch_input_dir, img2img_batch_output_dir, img2img_batch_inpaint_mask_dir, args)
 
         processed = Processed(p, [], p.seed, "")
     else:

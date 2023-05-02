@@ -3,7 +3,6 @@ import io
 import time
 import datetime
 import uvicorn
-import gradio as gr
 from threading import Lock
 from io import BytesIO
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
@@ -21,7 +20,7 @@ from modules.textual_inversion.textual_inversion import create_embedding, train_
 from modules.textual_inversion.preprocess import preprocess
 from modules.hypernetworks.hypernetwork import create_hypernetwork, train_hypernetwork
 from PIL import PngImagePlugin,Image
-from modules.sd_models import checkpoints_list, unload_model_weights, reload_model_weights
+from modules.sd_models import checkpoints_list
 from modules.sd_models_config import find_checkpoint_config_near_filename
 from modules.realesrgan_model import get_realesrgan_models
 from modules import devices
@@ -29,6 +28,7 @@ from typing import List
 import piexif
 import piexif.helper
 
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 def upscaler_to_index(name: str):
     try:
         return [x.name.lower() for x in shared.sd_upscalers].index(name.lower())
@@ -93,16 +93,6 @@ def encode_pil_to_base64(image):
     return base64.b64encode(bytes_data)
 
 def api_middleware(app: FastAPI):
-    rich_available = True
-    try:
-        import anyio # importing just so it can be placed on silent list
-        import starlette # importing just so it can be placed on silent list
-        from rich.console import Console
-        console = Console()
-    except:
-        import traceback
-        rich_available = False
-
     @app.middleware("http")
     async def log_and_time(req: Request, call_next):
         ts = time.time()
@@ -193,16 +183,16 @@ class Api:
         self.add_api_route("/sdapi/v1/train/embedding", self.train_embedding, methods=["POST"], response_model=TrainResponse)
         self.add_api_route("/sdapi/v1/train/hypernetwork", self.train_hypernetwork, methods=["POST"], response_model=TrainResponse)
         self.add_api_route("/sdapi/v1/memory", self.get_memory, methods=["GET"], response_model=MemoryResponse)
-        self.add_api_route("/sdapi/v1/unload-checkpoint", self.unloadapi, methods=["POST"])
-        self.add_api_route("/sdapi/v1/reload-checkpoint", self.reloadapi, methods=["POST"])
         self.add_api_route("/sdapi/v1/scripts", self.get_scripts_list, methods=["GET"], response_model=ScriptsList)
 
-        self.default_script_arg_txt2img = []
-        self.default_script_arg_img2img = []
-
     def add_api_route(self, path: str, endpoint, **kwargs):
-        if shared.cmd_opts.api_auth:
-            return self.app.add_api_route(path, endpoint, dependencies=[Depends(self.auth)], **kwargs)
+        if shared.cmd_opts.api_auth or shared.cmd_opts.tecky_auth:
+            dependencies=[]
+            if shared.cmd_opts.api_auth:
+                dependencies.append(Depends(self.auth))
+            if shared.cmd_opts.tecky_auth:
+                dependencies.append(Depends(self.tecky_auth))
+            return self.app.add_api_route(path, endpoint, dependencies=dependencies, **kwargs)
         return self.app.add_api_route(path, endpoint, **kwargs)
 
     def auth(self, credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
@@ -211,6 +201,21 @@ class Api:
                 return True
 
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
+    def tecky_auth(self,api_key_header:str=Depends(api_key_header)):
+        if api_key_header is None:
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Server is busy and API key missing")
+            shared.tecky_auth.valid = True
+            return True
+        shared.tecky_auth.auth_token = api_key_header
+        API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
+        if api_key_header not in API_KEYS:
+            if shared.state.job_count > 0:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Server is busy and Invalid API key")
+            shared.tecky_auth.valid = True
+            return True
+        shared.tecky_auth.valid = True
+        return True
 
     def get_selectable_script(self, script_name, script_runner):
         if script_name is None or script_name == "":
@@ -233,7 +238,7 @@ class Api:
         script_idx = script_name_to_index(script_name, script_runner.scripts)
         return script_runner.scripts[script_idx]
 
-    def init_default_script_args(self, script_runner):
+    def init_script_args(self, request, selectable_scripts, selectable_idx, script_runner):
         #find max idx from the scripts in runner and generate a none array to init script_args
         last_arg_index = 1
         for script in script_runner.scripts:
@@ -241,24 +246,13 @@ class Api:
                 last_arg_index = script.args_to
         # None everywhere except position 0 to initialize script args
         script_args = [None]*last_arg_index
-        script_args[0] = 0
-
-        # get default values
-        with gr.Blocks(): # will throw errors calling ui function without this
-            for script in script_runner.scripts:
-                if script.ui(script.is_img2img):
-                    ui_default_values = []
-                    for elem in script.ui(script.is_img2img):
-                        ui_default_values.append(elem.value)
-                    script_args[script.args_from:script.args_to] = ui_default_values
-        return script_args
-
-    def init_script_args(self, request, default_script_args, selectable_scripts, selectable_idx, script_runner):
-        script_args = default_script_args.copy()
         # position 0 in script_arg is the idx+1 of the selectable script that is going to be run when using scripts.scripts_*2img.run()
         if selectable_scripts:
             script_args[selectable_scripts.args_from:selectable_scripts.args_to] = request.script_args
             script_args[0] = selectable_idx + 1
+        else:
+            # when [0] = 0 no selectable script to run
+            script_args[0] = 0
 
         # Now check for always on scripts
         if request.alwayson_scripts and (len(request.alwayson_scripts) > 0):
@@ -281,8 +275,6 @@ class Api:
         if not script_runner.scripts:
             script_runner.initialize_scripts(False)
             ui.create_ui()
-        if not self.default_script_arg_txt2img:
-            self.default_script_arg_txt2img = self.init_default_script_args(script_runner)
         selectable_scripts, selectable_script_idx = self.get_selectable_script(txt2imgreq.script_name, script_runner)
 
         populate = txt2imgreq.copy(update={  # Override __init__ params
@@ -298,7 +290,7 @@ class Api:
         args.pop('script_args', None) # will refeed them to the pipeline directly after initializing them
         args.pop('alwayson_scripts', None)
 
-        script_args = self.init_script_args(txt2imgreq, self.default_script_arg_txt2img, selectable_scripts, selectable_script_idx, script_runner)
+        script_args = self.init_script_args(txt2imgreq, selectable_scripts, selectable_script_idx, script_runner)
 
         send_images = args.pop('send_images', True)
         args.pop('save_images', None)
@@ -335,8 +327,6 @@ class Api:
         if not script_runner.scripts:
             script_runner.initialize_scripts(True)
             ui.create_ui()
-        if not self.default_script_arg_img2img:
-            self.default_script_arg_img2img = self.init_default_script_args(script_runner)
         selectable_scripts, selectable_script_idx = self.get_selectable_script(img2imgreq.script_name, script_runner)
 
         populate = img2imgreq.copy(update={  # Override __init__ params
@@ -354,7 +344,7 @@ class Api:
         args.pop('script_args', None)  # will refeed them to the pipeline directly after initializing them
         args.pop('alwayson_scripts', None)
 
-        script_args = self.init_script_args(img2imgreq, self.default_script_arg_img2img, selectable_scripts, selectable_script_idx, script_runner)
+        script_args = self.init_script_args(img2imgreq, selectable_scripts, selectable_script_idx, script_runner)
 
         send_images = args.pop('send_images', True)
         args.pop('save_images', None)
@@ -469,16 +459,6 @@ class Api:
 
     def interruptapi(self):
         shared.state.interrupt()
-
-        return {}
-
-    def unloadapi(self):
-        unload_model_weights()
-
-        return {}
-
-    def reloadapi(self):
-        reload_model_weights()
 
         return {}
 
