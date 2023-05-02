@@ -173,12 +173,16 @@ class Api:
         if api_key_header is None:
             if shared.state.job_count > 0:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Server is busy and API key missing")
+            shared.tecky_auth.valid = True
             return True
+        shared.tecky_auth.auth_token = api_key_header
         API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
         if api_key_header not in API_KEYS:
             if shared.state.job_count > 0:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Server is busy and Invalid API key")
+            shared.tecky_auth.valid = True
             return True
+        shared.tecky_auth.valid = True
         return True
 
     def get_selectable_script(self, script_name, script_runner):

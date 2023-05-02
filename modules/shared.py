@@ -267,9 +267,29 @@ class State:
         self.current_image = image
         self.id_live_preview += 1
 
+class ApiAuth():
+    def __init__(self):
+        self.name = None
+        self.auth_token = None
+        self.valid = False
+    def api_available(self):
+        if self.valid is False:
+            if state.job_count > 0:
+                return False
+            else:
+                return True
+        elif self.valid is True:
+            return True
+
+class TeckyAuth(ApiAuth):
+    def __init__(self):
+        super().__init__()
+        self.name = "tecky"
 
 state = State()
 state.server_start = time.time()
+
+tecky_auth = TeckyAuth()
 
 styles_filename = cmd_opts.styles_file
 prompt_styles = modules.styles.StyleDatabase(styles_filename)
