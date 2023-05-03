@@ -108,6 +108,12 @@ class ApiAuth():
                 return True
         elif self.valid is True:
             return True
+    def demo_available(self):
+        import psutil
+        if self.api_available() is False and  psutil.cpu_percent() > 80:
+            return False
+        else:
+            return True
 
 class TeckyAuth(ApiAuth):
     def __init__(self):
