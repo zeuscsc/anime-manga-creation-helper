@@ -157,7 +157,7 @@ def api_middleware(app: FastAPI):
         if api_key is not None and api_key != "":
             tecky_payment=payment.PAYMENT_CACHE[api_key]
         else:
-            tecky_payment=payment.TeckyPayment()
+            tecky_payment=payment.TeckyPayment(api_key)
         tecky_payment.post_payment_handling(endpoint,method)
         return response
 
