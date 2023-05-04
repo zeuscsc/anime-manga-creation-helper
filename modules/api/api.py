@@ -154,10 +154,7 @@ def api_middleware(app: FastAPI):
         method=request.scope.get('method','err')
         response = await call_next(request)
         api_key=request.headers.get('Authorization','')
-        if api_key is not None and api_key != "" and api_key in payment.PAYMENT_CACHE:
-            tecky_payment=payment.PAYMENT_CACHE[api_key]
-        else:
-            tecky_payment=payment.TeckyPayment(api_key)
+        tecky_payment=payment.TeckyPayment.get_cache(api_key,endpoint,method)
         tecky_payment.post_payment_handling(endpoint,method)
         return response
 
@@ -216,8 +213,10 @@ class Api:
         self.default_script_arg_txt2img = []
         self.default_script_arg_img2img = []
 
-    def get_request_path(request: Request):
+    def get_request_endpoint(request: Request):
         return request.url.path
+    def get_request_method(request: Request):
+        return request.method
     def add_api_route(self, path: str, endpoint, **kwargs):
         if shared.cmd_opts.api_auth or shared.cmd_opts.tecky_auth:
             dependencies=[]
@@ -234,11 +233,10 @@ class Api:
                 return True
 
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
-    def tecky_auth(self,api_key_header:str=Depends(api_key_header),path:str=Depends(get_request_path)):
+    def tecky_auth(self,api_key_header:str=Depends(api_key_header),endpoint:str=Depends(get_request_endpoint),method:str=Depends(get_request_method)):
         import modules.api.payment as payment
-        tecky_payment = payment.TeckyPayment(api_key_header)
-        payment.PAYMENT_CACHE[api_key_header] = tecky_payment
-        return tecky_payment.pre_payment_handling(path)
+        tecky_payment = payment.TeckyPayment.create_cache(api_key_header,endpoint,method)
+        return tecky_payment.pre_payment_handling(endpoint)
 
     def get_selectable_script(self, script_name, script_runner):
         if script_name is None or script_name == "":

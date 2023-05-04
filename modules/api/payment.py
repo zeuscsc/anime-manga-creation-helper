@@ -33,6 +33,27 @@ class Payment():
         pass
     
 class TeckyPayment(Payment):
+    cache:dict[str,Payment]=dict()
+    @staticmethod
+    def get_cache_key(api_key: str,endpoint:str,method:str):
+        return f"{api_key}-{endpoint}:{method}"
+    @staticmethod
+    def create_cache(api_key: str,endpoint:str,method:str):
+        payment=TeckyPayment(api_key)
+        TeckyPayment.cache[TeckyPayment.get_cache_key(api_key,endpoint,method)]=payment
+        return payment
+    @staticmethod
+    def get_cache(api_key: str,endpoint:str,method:str):
+        key=TeckyPayment.get_cache_key(api_key,endpoint,method)
+        if key in TeckyPayment.cache:
+            return TeckyPayment.cache[key]
+        payment=TeckyPayment(api_key)
+        TeckyPayment.cache[key]=payment
+        return payment
+    @staticmethod
+    def set_cache(api_key: str,endpoint:str,method:str,payment:Payment):
+        TeckyPayment.cache[TeckyPayment.get_cache_key(api_key,endpoint,method)]=payment
+
     def __init__(self,api_key: str):
         super().__init__(api_key)
     def check_balance(self):
@@ -86,5 +107,5 @@ class TeckyPayment(Payment):
         except Exception as e:
             print(e)
             pass
-
-PAYMENT_CACHE:dict[str,Payment]=dict()
+        return
+    
