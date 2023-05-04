@@ -8,10 +8,10 @@ HEADER_NAME = "Authorization"
 API_TOPUP_URL="https://tecky.io/subscription/topup"
 SERVICE_API_KEY="HtRjFlAInENAA2atZjEGLHUer5k4D1GeCROwZ5VI/l4="
 SERVER_BUSY_ERROR_CODE=503
-
 class Payment():
     def __init__(self,api_key: str):
         self.api_key = api_key
+        self.need_payment=False
         self.route_cost={
             "/sdapi/v1/txt2img":10,
             "/sdapi/v1/img2img":10
@@ -72,9 +72,12 @@ class TeckyPayment(Payment):
             if balance<self.route_cost[endpoint]:
                 raise HTTPException(status_code=SERVER_BUSY_ERROR_CODE, \
                     detail=f"Insufficient balance. Please top up your account. Or you can get an API key from {API_TOPUP_URL}")
+        self.need_payment=True
         return True
     def post_payment_handling(self,endpoint,method):
         if self.api_key is None:
+            return
+        if self.need_payment is False:
             return
         try:
             if method=="POST":
@@ -83,3 +86,5 @@ class TeckyPayment(Payment):
         except Exception as e:
             print(e)
             pass
+
+PAYMENT_CACHE:dict[str,Payment]=dict()

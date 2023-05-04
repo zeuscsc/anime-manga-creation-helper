@@ -97,6 +97,7 @@ def encode_pil_to_base64(image):
 def api_middleware(app: FastAPI):
     rich_available = True
     try:
+        import modules.api.payment as payment
         import anyio # importing just so it can be placed on silent list
         import starlette # importing just so it can be placed on silent list
         from rich.console import Console
@@ -152,8 +153,7 @@ def api_middleware(app: FastAPI):
         endpoint=request.scope.get('path','err')
         method=request.scope.get('method','err')
         response = await call_next(request)
-        import modules.api.payment as payment
-        tecky_payment=payment.TeckyPayment(request.headers.get('Authorization',''))
+        tecky_payment=payment.PAYMENT_CACHE[request.headers.get('Authorization','')]
         tecky_payment.post_payment_handling(endpoint,method)
         return response
 
@@ -233,6 +233,7 @@ class Api:
     def tecky_auth(self,api_key_header:str=Depends(api_key_header),path:str=Depends(get_request_path)):
         import modules.api.payment as payment
         tecky_payment = payment.TeckyPayment(api_key_header)
+        payment.PAYMENT_CACHE[api_key_header] = tecky_payment
         return tecky_payment.pre_payment_handling(path)
 
     def get_selectable_script(self, script_name, script_runner):
