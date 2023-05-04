@@ -95,34 +95,6 @@ def reload_hypernetworks():
 
     hypernetworks = hypernetwork.list_hypernetworks(cmd_opts.hypernetwork_dir)
 
-class ApiAuth():
-    def __init__(self):
-        self.name = None
-        self.auth_token = None
-        self.valid = False
-    def api_available(self):
-        if self.valid is False:
-            if state.job_count > 0:
-                return False
-            else:
-                return True
-        elif self.valid is True:
-            return True
-    def demo_available(self):
-        import psutil
-        if self.api_available() is False and  psutil.cpu_percent() > 80:
-            return False
-        else:
-            return True
-
-class TeckyAuth(ApiAuth):
-    def __init__(self):
-        super().__init__()
-        self.name = "tecky"
-        
-tecky_auth = TeckyAuth()
-
-
 class State:
     skipped = False
     interrupted = False

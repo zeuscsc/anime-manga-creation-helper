@@ -112,7 +112,7 @@ def api_middleware(app: FastAPI):
         duration = str(round(time.time() - ts, 4))
         res.headers["X-Process-Time"] = duration
         endpoint = req.scope.get('path', 'err')
-        if shared.cmd_opts.api_log and endpoint.startswith('/sdapi'):
+        if shared.cmd_opts.api_log and endpoint.startswith('/sdapi') and endpoint!="/sdapi/v1/progress":
             print('API {t} {code} {prot}/{ver} {method} {endpoint} {cli} {duration}'.format(
                 t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
                 code = res.status_code,
@@ -146,6 +146,16 @@ def api_middleware(app: FastAPI):
             return await call_next(request)
         except Exception as e:
             return handle_exception(request, e)
+    
+    @app.middleware("http")
+    async def post_payment_handling(request:Request,call_next):
+        endpoint=request.scope.get('path','err')
+        method=request.scope.get('method','err')
+        response = await call_next(request)
+        import modules.api.payment as payment
+        tecky_payment=payment.TeckyPayment(request.headers.get('Authorization',''))
+        tecky_payment.post_payment_handling(endpoint,method)
+        return response
 
     @app.exception_handler(Exception)
     async def fastapi_exception_handler(request: Request, e: Exception):
@@ -202,6 +212,8 @@ class Api:
         self.default_script_arg_txt2img = []
         self.default_script_arg_img2img = []
 
+    def get_request_path(request: Request):
+        return request.url.path
     def add_api_route(self, path: str, endpoint, **kwargs):
         if shared.cmd_opts.api_auth or shared.cmd_opts.tecky_auth:
             dependencies=[]
@@ -218,21 +230,10 @@ class Api:
                 return True
 
         raise HTTPException(status_code=401, detail="Incorrect username or password", headers={"WWW-Authenticate": "Basic"})
-    def tecky_auth(self,api_key_header:str=Depends(api_key_header)):
-        if api_key_header is None:
-            if shared.state.job_count > 0:
-                raise HTTPException(status_code=403, detail="Server is busy and API key missing")
-            shared.tecky_auth.valid = True
-            return True
-        shared.tecky_auth.auth_token = api_key_header
-        API_KEYS = ["1234567890abcdef", "0987654321abcdef"]
-        if api_key_header not in API_KEYS:
-            if shared.state.job_count > 0:
-                raise HTTPException(status_code=401, detail="Server is busy and Invalid API key")
-            shared.tecky_auth.valid = True
-            return True
-        shared.tecky_auth.valid = True
-        return True
+    def tecky_auth(self,api_key_header:str=Depends(api_key_header),path:str=Depends(get_request_path)):
+        import modules.api.payment as payment
+        tecky_payment = payment.TeckyPayment(api_key_header)
+        return tecky_payment.pre_payment_handling(path)
 
     def get_selectable_script(self, script_name, script_runner):
         if script_name is None or script_name == "":
