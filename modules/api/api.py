@@ -154,7 +154,7 @@ def api_middleware(app: FastAPI):
         method=request.scope.get('method','err')
         response = await call_next(request)
         api_key=request.headers.get('Authorization','')
-        if api_key is not None and api_key != "":
+        if api_key is not None and api_key != "" and api_key in payment.PAYMENT_CACHE:
             tecky_payment=payment.PAYMENT_CACHE[api_key]
         else:
             tecky_payment=payment.TeckyPayment(api_key)
