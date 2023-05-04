@@ -60,6 +60,8 @@ class TeckyPayment(Payment):
         res = requests.post(url, headers=headers, json=data)
         return res.json()
     def pre_payment_handling(self, endpoint):
+        if endpoint=="/sdapi/v1/progress":
+            return True
         if self.demo_available():
             return True
         if self.api_key is None:
