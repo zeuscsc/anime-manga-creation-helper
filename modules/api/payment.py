@@ -74,6 +74,10 @@ class TeckyPayment(Payment):
     def post_payment_handling(self,endpoint,method):
         if self.api_key is None:
             return
-        if method=="POST":
-            if endpoint in self.route_cost:
-                self.pay(self.route_cost[endpoint],f"{endpoint} [{method}] Called")
+        try:
+            if method=="POST":
+                if endpoint in self.route_cost:
+                    self.pay(self.route_cost[endpoint],f"{endpoint} [{method}] Called")
+        except Exception as e:
+            print(e)
+            pass
