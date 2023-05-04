@@ -153,7 +153,11 @@ def api_middleware(app: FastAPI):
         endpoint=request.scope.get('path','err')
         method=request.scope.get('method','err')
         response = await call_next(request)
-        tecky_payment=payment.PAYMENT_CACHE[request.headers.get('Authorization','')]
+        api_key=request.headers.get('Authorization','')
+        if api_key is not None and api_key != "":
+            tecky_payment=payment.PAYMENT_CACHE[api_key]
+        else:
+            tecky_payment=payment.TeckyPayment()
         tecky_payment.post_payment_handling(endpoint,method)
         return response
 
